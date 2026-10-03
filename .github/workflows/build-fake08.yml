@@ -35,8 +35,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          emmake make platform=emscripten clean
-          emmake make platform=emscripten -j2
+          emmake make platform=emscripten SHARED="-shared" clean
+          emmake make platform=emscripten SHARED="-shared" -j2
 
           test -f fake08_libretro_emscripten.bc
           test -s fake08_libretro_emscripten.bc
