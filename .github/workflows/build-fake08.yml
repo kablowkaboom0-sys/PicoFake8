@@ -35,8 +35,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          emmake make platform=emscripten SHARED="-shared" clean
-          emmake make platform=emscripten SHARED="-shared" -j2
+          # The upstream Makefile uses ELF-style linker flags for its Emscripten
+          # relocatable build. Keep the upstream FAKE-08 source unchanged, but
+          # remove only those incompatible linker flags from the build recipe.
+          sed -i 's#SHARED := -shared -Wl,--version-script=link.T -Wl,--no-undefined#SHARED := -shared#' Makefile
+          grep -A3 -B2 'platform), emscripten' Makefile
+
+          emmake make platform=emscripten clean
+          emmake make platform=emscripten -j2
 
           test -f fake08_libretro_emscripten.bc
           test -s fake08_libretro_emscripten.bc
