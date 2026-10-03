@@ -1,14 +1,28 @@
 # PicoFake8
 
-Standalone PicoFake8 player.
+PicoFake8 is being converted to use the **actual FAKE-08 emulator source** from jtothebell/fake-08.
 
-- Single HTML page
-- No CDN
-- No iframe
-- No external scripts or assets
-- Loads text `.p8` cartridges locally
-- Keyboard and touch controls
-- 128x128 pixel-style canvas
-- Fullscreen support
+## Current state
 
-This is a lightweight PICO-8-style compatibility player, not the official PICO-8 runtime. It supports a subset of common `.p8` Lua cartridges; complex cartridges may require additional compatibility work.
+The repository still contains the earlier lightweight compatibility player. It is **not** being described as FAKE-08.
+
+A GitHub Actions build has now been added that:
+
+1. checks out the upstream FAKE-08 repository with its submodules;
+2. builds its libretro source with Emscripten;
+3. links those upstream objects into a browser WebAssembly module;
+4. copies the upstream FAKE-08 license into the build output;
+5. uploads the generated browser core as a GitHub Actions artifact.
+
+The browser frontend is deliberately not claimed to be finished yet. The existing player remains in place until the upstream core build and a compatible browser frontend are actually verified.
+
+## Runtime requirements
+
+The eventual published page is intended to contain the generated JavaScript/WASM locally, with no CDN, iframe, or runtime external dependency.
+
+## Upstream
+
+FAKE-08:
+https://github.com/jtothebell/fake-08
+
+FAKE-08 is not PICO-8 and is not related to or supported by Lexaloffle Software.
