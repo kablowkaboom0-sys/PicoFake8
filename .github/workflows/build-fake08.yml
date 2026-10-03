@@ -42,14 +42,13 @@ jobs:
             exit 1
           fi
 
-          emar rcs fake08_libretro.a $OBJS
 
       - name: Link upstream FAKE-08 into browser WASM
         working-directory: upstream/fake-08/platform/libretro
         run: |
           mkdir -p ../../../web/fake08
 
-          emcc fake08_libretro.a \
+          em++ $OBJS \
             -O2 \
             -fexceptions \
             -sSUPPORT_LONGJMP=emscripten \
@@ -62,7 +61,7 @@ jobs:
             -sINITIAL_MEMORY=33554432 \
             -sMAXIMUM_MEMORY=268435456 \
             -sALLOW_TABLE_GROWTH=1 \
-            -sEXPORTED_FUNCTIONS='["_retro_api_version","_retro_init","_retro_deinit","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_audio_sample_batch","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_info","_retro_get_system_av_info","_retro_load_game","_retro_unload_game","_retro_run","_retro_reset","_retro_serialize_size","_retro_serialize","_retro_unserialize","_retro_cheat_reset","_retro_cheat_set","_retro_get_memory_data","_retro_get_memory_size","_retro_get_region","_retro_set_controller_port_device","_malloc","_free"]' \
+            -sEXPORTED_FUNCTIONS='["_retro_api_version","_retro_init","_retro_deinit","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_info","_retro_get_system_av_info","_retro_load_game","_retro_unload_game","_retro_run","_retro_reset","_retro_serialize_size","_retro_serialize","_retro_unserialize","_retro_cheat_reset","_retro_cheat_set","_retro_get_memory_data","_retro_get_memory_size","_retro_get_region","_retro_set_controller_port_device","_malloc","_free"]' \
             -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPU8","HEAPU16","HEAPU32","HEAP16","HEAP32","HEAPF32","UTF8ToString","stringToUTF8","lengthBytesUTF8","getValue","setValue","FS"]' \
             -sFILESYSTEM=1 \
             -sINVOKE_RUN=0 \
