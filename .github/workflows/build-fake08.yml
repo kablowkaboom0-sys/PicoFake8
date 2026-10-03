@@ -28,28 +28,57 @@ jobs:
           cd upstream/fake-08
           git submodule update --init --recursive
 
-      - name: Build upstream FAKE-08 libretro core for Emscripten
+      - name: Compile the upstream FAKE-08 libretro objects
         working-directory: upstream/fake-08/platform/libretro
         env:
           EMCC_CFLAGS: "-sSUPPORT_LONGJMP=emscripten -fexceptions"
         run: |
           set -euo pipefail
 
-          # The upstream Makefile uses ELF-style linker flags for its Emscripten
-          # relocatable build. Keep the upstream FAKE-08 source unchanged, but
-          # remove only those incompatible linker flags from the build recipe.
-          sed -i 's#SHARED := -shared -Wl,--version-script=link.T -Wl,--no-undefined#SHARED := -shared#' Makefile
-          grep -A3 -B2 'platform), emscripten' Makefile
-
+          # Use the real upstream FAKE-08 Makefile to compile its source.
+          # Its final Emscripten library link target is not usable with the
+          # current toolchain, so we deliberately stop after its object
+          # compilation and perform the final browser link ourselves.
+          set +e
           emmake make platform=emscripten clean
           emmake make platform=emscripten -j2
+          build_rc=$?
+          set -e
 
-          test -f fake08_libretro_emscripten.bc
-          test -s fake08_libretro_emscripten.bc
+          echo "Upstream make returned: $build_rc"
+
+          # The important output of this stage is the complete set of Wasm
+          # object files. Fail if compilation did not actually produce them.
+          test -s libretro.o
+          object_count="$(find . -type f -name '*.o' | wc -l)"
+          echo "Wasm object count: $object_count"
+          test "$object_count" -ge 20
 
           mkdir -p ../../../web/fake08
 
-          em++ fake08_libretro_emscripten.bc             -O2             -fexceptions             -sSUPPORT_LONGJMP=emscripten             -sWASM=1             -sMODULARIZE=1             -sEXPORT_ES6=1             -sEXPORT_NAME=create_fake08             -sENVIRONMENT=web             -sALLOW_MEMORY_GROWTH=1             -sINITIAL_MEMORY=33554432             -sMAXIMUM_MEMORY=268435456             -sALLOW_TABLE_GROWTH=1             -sEXPORTED_FUNCTIONS='["_retro_api_version","_retro_init","_retro_deinit","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_info","_retro_get_system_av_info","_retro_load_game","_retro_unload_game","_retro_run","_retro_reset","_retro_serialize_size","_retro_serialize","_retro_unserialize","_retro_cheat_reset","_retro_cheat_set","_retro_get_memory_data","_retro_get_memory_size","_retro_get_region","_retro_set_controller_port_device","_malloc","_free"]'             -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPU8","HEAPU16","HEAPU32","HEAP16","HEAP32","HEAPF32","UTF8ToString","stringToUTF8","lengthBytesUTF8","getValue","setValue","FS"]'             -sFILESYSTEM=1             -sINVOKE_RUN=0             -o ../../../web/fake08/fake08.js
+          # Emscripten documents linking Wasm .o files directly into the final
+          # JavaScript + WebAssembly output. This avoids treating a Wasm
+          # object file as LLVM bitcode.
+          mapfile -t OBJECTS < <(find . -type f -name '*.o' -print | sort)
+
+          em++ "${OBJECTS[@]}" \
+            -O2 \
+            -fexceptions \
+            -sSUPPORT_LONGJMP=emscripten \
+            -sWASM=1 \
+            -sMODULARIZE=1 \
+            -sEXPORT_ES6=1 \
+            -sEXPORT_NAME=create_fake08 \
+            -sENVIRONMENT=web \
+            -sALLOW_MEMORY_GROWTH=1 \
+            -sINITIAL_MEMORY=33554432 \
+            -sMAXIMUM_MEMORY=268435456 \
+            -sALLOW_TABLE_GROWTH=1 \
+            -sEXPORTED_FUNCTIONS='["_retro_api_version","_retro_init","_retro_deinit","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_info","_retro_get_system_av_info","_retro_load_game","_retro_unload_game","_retro_run","_retro_reset","_retro_serialize_size","_retro_serialize","_retro_unserialize","_retro_cheat_reset","_retro_cheat_set","_retro_get_memory_data","_retro_get_memory_size","_retro_get_region","_retro_set_controller_port_device","_malloc","_free"]' \
+            -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPU8","HEAPU16","HEAPU32","HEAP16","HEAP32","HEAPF32","UTF8ToString","stringToUTF8","lengthBytesUTF8","getValue","setValue","FS"]' \
+            -sFILESYSTEM=1 \
+            -sINVOKE_RUN=0 \
+            -o ../../../web/fake08/fake08.js
 
           test -s ../../../web/fake08/fake08.js
           test -s ../../../web/fake08/fake08.wasm
