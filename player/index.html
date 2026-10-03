@@ -24,9 +24,17 @@ function pxaDecompress(src){const r=readBitsFactory(src),head=[];for(let i=0;i<8
 function miniDecompress(src){const lit="^\\n 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_";let p=8,out=[];const len=src[4]*256+src[5];while(out.length<len){let v=src[p++];if(v<60){if(v===0)out.push(src[p++]);else out.push(lit.charCodeAt(v))}else{const off=(v-60)*16+(src[p++]&15),n=(src[p-1]>>4)+2;for(let i=0;i<n;i++)out.push(out[out.length-off])}}return new TextDecoder().decode(new Uint8Array(out))}
 async function decodeP8Png(file){const url=URL.createObjectURL(file);try{const img=new Image();img.decoding="async";await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(Error("The cartridge PNG could not be decoded by this browser."));img.src=url});if(img.naturalWidth!==160||img.naturalHeight!==205)throw Error("Not a valid PICO-8 .p8.png cartridge (expected 160×205).");const cv=document.createElement("canvas");cv.width=160;cv.height=205;const cx=cv.getContext("2d",{willReadFrequently:true});cx.drawImage(img,0,0);const d=cx.getImageData(0,0,160,205).data,rom=new Uint8Array(32800);let o=0;for(let i=0;i<d.length&&o<rom.length;i+=4){rom[o++]=((d[i+3]&3)<<6)|((d[i]&3)<<4)|((d[i+1]&3)<<2)|(d[i+2]&3)}if(o<32768)throw Error("Cartridge image data is incomplete.");const code=rom.slice(0x4300,0x8000);if(code[0]===0&&code[1]===112&&code[2]===120&&code[3]===97)return pxaDecompress(code);if(code[0]===58&&code[1]===99&&code[2]===58&&code[3]===0)return miniDecompress(code);let end=0;while(end<code.length&&code[end]!==0)end++;return new TextDecoder().decode(code.slice(0,end))}finally{URL.revokeObjectURL(url)}}
 
+function luaTables(src){
+ let out="",i=0;
+ function splitTop(v){let a=[],st="",d=0,q=null;for(let j=0;j<v.length;j++){let ch=v[j];if(q){st+=ch;if(ch===q&&v[j-1]!=="\\\\")q=null;continue}if(ch==="\\""){q=ch;st+=ch;continue}if("([{".includes(ch))d++;else if(")]}".includes(ch))d--;if(ch===","&&d===0){a.push(st.trim());st="";}else st+=ch}if(st.trim())a.push(st.trim());return a}
+ function conv(v){let z=v.trim();if(!z.startsWith("{")||!z.endsWith("}"))return z;let inner=z.slice(1,-1).trim();if(!inner)return "[]";let parts=splitTop(inner);let keyed=parts.some(p=>/^([A-Za-z_]\\w*|\\[[^]]+\\])\\s*=/.test(p));return keyed?"{"+parts.map(p=>{let m=p.match(/^([A-Za-z_]\\w*)\\s*=\\s*(.*)$/s);return m?m[1]+":"+conv(m[2]):p}).join(",")+"}":"["+parts.map(conv).join(",")+"]"}
+ while(i<src.length){if(src[i]==="{"){let d=1,j=i+1,q=null;for(;j<src.length&&d;j++){let ch=src[j];if(q){if(ch===q&&src[j-1]!=="\\\\")q=null;continue}if(ch==="\\""||ch==="'")q=ch;else if(ch==="{")d++;else if(ch==="}")d--}if(d===0){out+=conv(src.slice(i,j+1));i=j+1;continue}}out+=src[i++]}return out
+}
 function compile(src){
  let s=src.replace(/\r/g,"").replace(/--.*$/gm,"");
- s=s.replace(/\btrue\b/g,"true").replace(/\bfalse\b/g,"false").replace(/\bnil\b/g,"null");\n s=s.replace(/\^/g,"**");
+ s=luaTables(s);
+ s=s.replace(/\btrue\b/g,"true").replace(/\bfalse\b/g,"false").replace(/\bnil\b/g,"null");
+ s=s.replace(/\^/g,"**").replace(/\.\./g,"+").replace(/#([A-Za-z_]\w*)/g,"$1.length");
  s=s.replace(/~= /g,"!==").replace(/~=/g,"!==").replace(/\band\b/g,"&&").replace(/\bor\b/g,"||").replace(/\bnot\b/g,"!");
  s=s.replace(/function\s+(_init|_update60|_update|_draw)\s*\(([^)]*)\)/g,"function $1($2){");
  s=s.replace(/\bfunction\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/g,"function $1($2){");
